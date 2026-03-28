@@ -1,0 +1,20 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:authdb;MODE=MySQL;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+
+jwt:
+  secret: test-super-secret-key-that-is-at-least-32-characters
+  expiration: 3600000
+  refresh-expiration: 86400000
+
+app:
+  bootstrap-admin:
+    username: admin
+    password: password

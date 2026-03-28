@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: claims-config
+data:
+  SERVER_PORT: "8083"
+  SPRING_DATA_REDIS_HOST: redis
+  SPRING_DATA_REDIS_PORT: "6379"
+  SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+  POLICY_EVENTS_TOPIC: policy-events
+  CLAIM_EVENTS_TOPIC: claim-events
+  POLICY_SERVICE_BASE_URL: http://policy-service:8082

@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gateway-config
+data:
+  SERVER_PORT: "8080"
+  SPRING_DATA_REDIS_HOST: redis
+  SPRING_DATA_REDIS_PORT: "6379"
+  AUTH_SERVICE_URL: http://auth-service:8081
+  POLICY_SERVICE_URL: http://policy-service:8082
+  CLAIMS_SERVICE_URL: http://claims-service:8083
+  LOGIN_RATE_LIMIT: "10"
+  CLAIM_SUBMIT_RATE_LIMIT: "20"

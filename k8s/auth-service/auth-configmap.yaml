@@ -3,5 +3,6 @@ kind: ConfigMap
 metadata:
   name: auth-config
 data:
-  SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/authdb
+  SERVER_PORT: "8081"
+  SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/authdb?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
   SPRING_DATASOURCE_USERNAME: auth_user

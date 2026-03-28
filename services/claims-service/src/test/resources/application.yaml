@@ -1,0 +1,29 @@
+spring:
+  data:
+    redis:
+      host: localhost
+      port: 6379
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: claims-service-test
+    listener:
+      auto-startup: false
+
+management:
+  health:
+    redis:
+      enabled: false
+    kafka:
+      enabled: false
+
+jwt:
+  secret: test-super-secret-key-that-is-at-least-32-characters
+
+app:
+  kafka:
+    policy-topic: policy-events
+    claim-topic: claim-events
+  policy-service:
+    base-url: http://localhost:8082
+    internal-api-key: internal-shared-key

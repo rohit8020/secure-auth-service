@@ -1,0 +1,47 @@
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  application:
+    name: api-gateway
+  data:
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
+  cloud:
+    compatibility-verifier:
+      enabled: false
+    gateway:
+      routes:
+        - id: auth-service
+          uri: ${AUTH_SERVICE_URL:http://localhost:8081}
+          predicates:
+            - Path=/api/auth/**
+          filters:
+            - RewritePath=/api/auth/?(?<segment>.*), /auth/$\{segment}
+        - id: policy-service
+          uri: ${POLICY_SERVICE_URL:http://localhost:8082}
+          predicates:
+            - Path=/api/policies/**
+          filters:
+            - RewritePath=/api/policies/?(?<segment>.*), /policies/$\{segment}
+        - id: claims-service
+          uri: ${CLAIMS_SERVICE_URL:http://localhost:8083}
+          predicates:
+            - Path=/api/claims/**
+          filters:
+            - RewritePath=/api/claims/?(?<segment>.*), /claims/$\{segment}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+jwt:
+  secret: ${JWT_SECRET:my-super-secret-key-that-is-at-least-32-characters}
+
+app:
+  rate-limit:
+    login-per-minute: ${LOGIN_RATE_LIMIT:10}
+    claim-submit-per-minute: ${CLAIM_SUBMIT_RATE_LIMIT:20}

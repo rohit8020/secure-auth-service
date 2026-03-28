@@ -1,0 +1,21 @@
+spring:
+  data:
+    redis:
+      host: localhost
+      port: 6379
+  cloud:
+    compatibility-verifier:
+      enabled: false
+
+management:
+  health:
+    redis:
+      enabled: false
+
+jwt:
+  secret: test-super-secret-key-that-is-at-least-32-characters
+
+app:
+  rate-limit:
+    login-per-minute: 10
+    claim-submit-per-minute: 20

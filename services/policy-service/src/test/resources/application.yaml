@@ -1,0 +1,20 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:policydb;MODE=PostgreSQL;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+  kafka:
+    bootstrap-servers: localhost:9092
+
+jwt:
+  secret: test-super-secret-key-that-is-at-least-32-characters
+
+app:
+  kafka:
+    policy-topic: policy-events
+  internal-api-key: internal-shared-key

@@ -1,0 +1,39 @@
+server:
+  port: ${SERVER_PORT:8083}
+
+spring:
+  application:
+    name: claims-service
+  data:
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: claims-service
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: com.rohit8020.claimsservice.event
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+jwt:
+  secret: ${JWT_SECRET:my-super-secret-key-that-is-at-least-32-characters}
+
+app:
+  kafka:
+    policy-topic: ${POLICY_EVENTS_TOPIC:policy-events}
+    claim-topic: ${CLAIM_EVENTS_TOPIC:claim-events}
+  policy-service:
+    base-url: ${POLICY_SERVICE_BASE_URL:http://localhost:8082}
+    internal-api-key: ${INTERNAL_API_KEY:internal-shared-key}
