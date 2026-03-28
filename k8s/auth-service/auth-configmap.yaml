@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: auth-config
+data:
+  SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/authdb
+  SPRING_DATASOURCE_USERNAME: auth_user
