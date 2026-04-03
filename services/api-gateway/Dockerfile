@@ -16,7 +16,7 @@ RUN mvn -B -q -pl services/api-gateway -am clean package -DskipTests
 FROM eclipse-temurin:17-jre
 WORKDIR /app
 
-COPY --from=build /workspace/services/api-gateway/target/*jar app.jar
+COPY --from=build /workspace/services/api-gateway/target/api-gateway-*.jar app.jar
 
 EXPOSE 8080
 ENTRYPOINT ["java","-jar","app.jar"]

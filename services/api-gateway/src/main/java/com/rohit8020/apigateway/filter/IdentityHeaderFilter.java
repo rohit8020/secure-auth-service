@@ -16,9 +16,10 @@ public class IdentityHeaderFilter implements GlobalFilter, Ordered {
         return exchange.getPrincipal()
                 .cast(JwtAuthenticationToken.class)
                 .flatMap(authentication -> {
+                    Object userId = authentication.getToken().getClaims().get("userId");
                     ServerWebExchange mutated = exchange.mutate()
                             .request(builder -> builder
-                                    .header("X-User-Id", String.valueOf(authentication.getToken().getClaim("userId")))
+                                    .header("X-User-Id", userId == null ? "" : userId.toString())
                                     .header("X-Username", authentication.getToken().getSubject())
                                     .header("X-User-Role", authentication.getToken().getClaimAsString("role")))
                             .build();

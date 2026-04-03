@@ -9,7 +9,7 @@ ADMIN_USER="${ADMIN_USERNAME:-admin}"
 ADMIN_PASSWORD="${ADMIN_PASSWORD:-Admin@12345}"
 
 json_field() {
-  python3 - "$1" <<'PY'
+  python3 -c '
 import json
 import sys
 
@@ -18,7 +18,7 @@ path = sys.argv[1].split(".")
 for key in path:
     data = data[key]
 print(data)
-PY
+' "$1"
 }
 
 wait_for() {

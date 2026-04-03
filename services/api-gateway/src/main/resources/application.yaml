@@ -18,19 +18,19 @@ spring:
           predicates:
             - Path=/api/auth/**
           filters:
-            - RewritePath=/api/auth/?(?<segment>.*), /auth/$\{segment}
+            - RewritePath=/api/auth(?<segment>/?.*), /auth$\{segment}
         - id: policy-service
           uri: ${POLICY_SERVICE_URL:http://localhost:8082}
           predicates:
             - Path=/api/policies/**
           filters:
-            - RewritePath=/api/policies/?(?<segment>.*), /policies/$\{segment}
+            - RewritePath=/api/policies(?<segment>/?.*), /policies$\{segment}
         - id: claims-service
           uri: ${CLAIMS_SERVICE_URL:http://localhost:8083}
           predicates:
             - Path=/api/claims/**
           filters:
-            - RewritePath=/api/claims/?(?<segment>.*), /claims/$\{segment}
+            - RewritePath=/api/claims(?<segment>/?.*), /claims$\{segment}
 
 management:
   endpoints:
