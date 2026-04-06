@@ -1,4 +1,7 @@
 spring:
+  task:
+    scheduling:
+      enabled: false
   datasource:
     url: jdbc:h2:mem:policydb;MODE=PostgreSQL;DB_CLOSE_DELAY=-1
     driver-class-name: org.h2.Driver
@@ -6,15 +9,20 @@ spring:
     password:
   jpa:
     hibernate:
-      ddl-auto: create-drop
+      ddl-auto: validate
     show-sql: false
+  flyway:
+    enabled: true
   kafka:
     bootstrap-servers: localhost:9092
-
-jwt:
-  secret: test-super-secret-key-that-is-at-least-32-characters
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: http://localhost:8081/oauth2/jwks
 
 app:
   kafka:
-    policy-topic: policy-events
-  internal-api-key: internal-shared-key
+    policy-topic: policy-events.v1
+  outbox:
+    enabled: false

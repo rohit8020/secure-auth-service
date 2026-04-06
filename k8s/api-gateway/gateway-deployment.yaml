@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: api-gateway
 spec:
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
       app: api-gateway
@@ -18,49 +18,31 @@ spec:
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
-          env:
-            - name: SERVER_PORT
-              valueFrom:
-                configMapKeyRef:
-                  name: gateway-config
-                  key: SERVER_PORT
-            - name: SPRING_DATA_REDIS_HOST
-              valueFrom:
-                configMapKeyRef:
-                  name: gateway-config
-                  key: SPRING_DATA_REDIS_HOST
-            - name: SPRING_DATA_REDIS_PORT
-              valueFrom:
-                configMapKeyRef:
-                  name: gateway-config
-                  key: SPRING_DATA_REDIS_PORT
-            - name: AUTH_SERVICE_URL
-              valueFrom:
-                configMapKeyRef:
-                  name: gateway-config
-                  key: AUTH_SERVICE_URL
-            - name: POLICY_SERVICE_URL
-              valueFrom:
-                configMapKeyRef:
-                  name: gateway-config
-                  key: POLICY_SERVICE_URL
-            - name: CLAIMS_SERVICE_URL
-              valueFrom:
-                configMapKeyRef:
-                  name: gateway-config
-                  key: CLAIMS_SERVICE_URL
-            - name: LOGIN_RATE_LIMIT
-              valueFrom:
-                configMapKeyRef:
-                  name: gateway-config
-                  key: LOGIN_RATE_LIMIT
-            - name: CLAIM_SUBMIT_RATE_LIMIT
-              valueFrom:
-                configMapKeyRef:
-                  name: gateway-config
-                  key: CLAIM_SUBMIT_RATE_LIMIT
-            - name: JWT_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: auth-secret
-                  key: JWT_SECRET
+          envFrom:
+            - configMapRef:
+                name: gateway-config
+          startupProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            periodSeconds: 10
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8080
+            periodSeconds: 10
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8080
+            periodSeconds: 20
+            timeoutSeconds: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi

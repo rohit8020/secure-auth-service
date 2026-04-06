@@ -4,10 +4,28 @@ server:
 spring:
   application:
     name: claims-service
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/claimsdb?currentSchema=claims_service}
+    username: ${SPRING_DATASOURCE_USERNAME:policy_user}
+    password: ${SPRING_DATASOURCE_PASSWORD:Policy@123Password!}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        default_schema: claims_service
+  flyway:
+    enabled: true
+    default-schema: claims_service
+    create-schemas: true
   data:
     redis:
       host: ${SPRING_DATA_REDIS_HOST:localhost}
       port: ${SPRING_DATA_REDIS_PORT:6379}
+      repositories:
+        enabled: false
   kafka:
     bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     consumer:
@@ -16,24 +34,75 @@ spring:
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
-        spring.json.trusted.packages: com.rohit8020.claimsservice.event
+        spring.json.trusted.packages: com.rohit8020.platformcommon.event
+        spring.json.value.default.type: com.rohit8020.platformcommon.event.DomainEvent
+    listener:
+      ack-mode: manual
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: ${AUTH_JWK_SET_URI:http://localhost:8081/oauth2/jwks}
 
 management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+  tracing:
+    sampling:
+      probability: 1.0
+  zipkin:
+    tracing:
+      endpoint: ${ZIPKIN_ENDPOINT:http://localhost:9411/api/v2/spans}
 
-jwt:
-  secret: ${JWT_SECRET:my-super-secret-key-that-is-at-least-32-characters}
+logging:
+  structured:
+    format:
+      console: ecs
 
 app:
   kafka:
-    policy-topic: ${POLICY_EVENTS_TOPIC:policy-events}
-    claim-topic: ${CLAIM_EVENTS_TOPIC:claim-events}
+    policy-topic: ${POLICY_EVENTS_TOPIC:policy-events.v1}
+    claim-topic: ${CLAIM_EVENTS_TOPIC:claim-events.v1}
+    policy-dlq-topic: ${POLICY_EVENTS_DLQ_TOPIC:policy-events.DLQ}
+    claim-dlq-topic: ${CLAIM_EVENTS_DLQ_TOPIC:claim-events.DLQ}
+  outbox:
+    batch-size: ${OUTBOX_BATCH_SIZE:25}
+    fixed-delay-ms: ${OUTBOX_FIXED_DELAY_MS:5000}
+  auth-service:
+    base-url: ${AUTH_SERVICE_BASE_URL:http://localhost:8081}
+    client-id: ${AUTH_CLIENT_ID:claims-service}
+    client-secret: ${AUTH_CLIENT_SECRET:claims-service-secret}
+    scope: ${AUTH_CLIENT_SCOPE:policy.projection.read}
   policy-service:
     base-url: ${POLICY_SERVICE_BASE_URL:http://localhost:8082}
-    internal-api-key: ${INTERNAL_API_KEY:internal-shared-key}
+    connect-timeout-ms: ${POLICY_SERVICE_CONNECT_TIMEOUT_MS:2000}
+    read-timeout-ms: ${POLICY_SERVICE_READ_TIMEOUT_MS:3000}
+
+resilience4j:
+  retry:
+    instances:
+      policy-service:
+        max-attempts: 3
+        wait-duration: 500ms
+  circuitbreaker:
+    instances:
+      policy-service:
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s

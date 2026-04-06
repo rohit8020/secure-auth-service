@@ -7,6 +7,8 @@ POLICYHOLDER_USER="policyholder_${SUFFIX}"
 AGENT_USER="agent_${SUFFIX}"
 ADMIN_USER="${ADMIN_USERNAME:-admin}"
 ADMIN_PASSWORD="${ADMIN_PASSWORD:-Admin@12345}"
+POLICY_IDEMPOTENCY_KEY="issue-policy-${SUFFIX}"
+CLAIM_IDEMPOTENCY_KEY="submit-claim-${SUFFIX}"
 
 json_field() {
   python3 -c '
@@ -71,14 +73,28 @@ agent_token="$(printf '%s' "$agent_login" | json_field accessToken)"
 echo "Issuing a policy..."
 policy_response="$(post_json "${BASE_URL}/api/policies" \
   "{\"policyholderId\":${policyholder_id},\"assignedAgentId\":${agent_id},\"premium\":199.99,\"startDate\":\"2026-01-01\",\"endDate\":\"2027-12-31\"}" \
-  -H "Authorization: Bearer ${agent_token}")"
+  -H "Authorization: Bearer ${agent_token}" \
+  -H "Idempotency-Key: ${POLICY_IDEMPOTENCY_KEY}")"
 policy_id="$(printf '%s' "$policy_response" | json_field id)"
 
 echo "Submitting a claim..."
 claim_response="$(post_json "${BASE_URL}/api/claims" \
   "{\"policyId\":\"${policy_id}\",\"description\":\"Broken windshield\",\"claimAmount\":350.00}" \
-  -H "Authorization: Bearer ${policyholder_token}")"
+  -H "Authorization: Bearer ${policyholder_token}" \
+  -H "Idempotency-Key: ${CLAIM_IDEMPOTENCY_KEY}")"
 claim_id="$(printf '%s' "$claim_response" | json_field id)"
+
+echo "Replaying the claim submission with the same idempotency key..."
+claim_replay_response="$(post_json "${BASE_URL}/api/claims" \
+  "{\"policyId\":\"${policy_id}\",\"description\":\"Broken windshield\",\"claimAmount\":350.00}" \
+  -H "Authorization: Bearer ${policyholder_token}" \
+  -H "Idempotency-Key: ${CLAIM_IDEMPOTENCY_KEY}")"
+replayed_claim_id="$(printf '%s' "$claim_replay_response" | json_field id)"
+
+if [[ "${replayed_claim_id}" != "${claim_id}" ]]; then
+  echo "Expected idempotent claim replay to return ${claim_id}, got ${replayed_claim_id}" >&2
+  exit 1
+fi
 
 echo "Verifying the claim as agent..."
 post_json "${BASE_URL}/api/claims/${claim_id}/verify" \

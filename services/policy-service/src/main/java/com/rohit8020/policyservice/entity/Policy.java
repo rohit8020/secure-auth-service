@@ -10,6 +10,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+import jakarta.persistence.Index;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -19,7 +20,12 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Entity
-@Table(name = "policies")
+@Table(name = "policies", indexes = {
+        @Index(name = "idx_policies_policyholder_id", columnList = "policyholderId"),
+        @Index(name = "idx_policies_assigned_agent_id", columnList = "assignedAgentId"),
+        @Index(name = "idx_policies_status", columnList = "status"),
+        @Index(name = "idx_policies_created_at", columnList = "createdAt")
+})
 @Getter
 @Setter
 @NoArgsConstructor

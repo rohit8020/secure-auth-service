@@ -4,14 +4,16 @@ import com.rohit8020.claimsservice.dto.ClaimDecisionRequest;
 import com.rohit8020.claimsservice.dto.ClaimResponse;
 import com.rohit8020.claimsservice.dto.SubmitClaimRequest;
 import com.rohit8020.claimsservice.service.ClaimsService;
+import com.rohit8020.platformcommon.api.PagedResponse;
 import jakarta.validation.Valid;
-import java.util.List;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -27,8 +29,9 @@ public class ClaimController {
 
     @PostMapping
     public ResponseEntity<ClaimResponse> submit(Authentication authentication,
+                                                @RequestHeader("Idempotency-Key") String idempotencyKey,
                                                 @Valid @RequestBody SubmitClaimRequest request) {
-        return ResponseEntity.ok(claimsService.submit(authentication, request));
+        return ResponseEntity.ok(claimsService.submit(authentication, request, idempotencyKey));
     }
 
     @PostMapping("/{claimId}/verify")
@@ -58,7 +61,11 @@ public class ClaimController {
     }
 
     @GetMapping
-    public ResponseEntity<List<ClaimResponse>> list(Authentication authentication) {
-        return ResponseEntity.ok(claimsService.list(authentication));
+    public ResponseEntity<PagedResponse<ClaimResponse>> list(Authentication authentication,
+                                                             @RequestParam(defaultValue = "0") int page,
+                                                             @RequestParam(defaultValue = "20") int size,
+                                                             @RequestParam(defaultValue = "createdAt,desc")
+                                                             String sort) {
+        return ResponseEntity.ok(claimsService.list(authentication, page, size, sort));
     }
 }

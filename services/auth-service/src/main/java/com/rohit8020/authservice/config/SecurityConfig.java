@@ -1,21 +1,27 @@
 package com.rohit8020.authservice.config;
 
-import java.nio.charset.StandardCharsets;
+import java.security.interfaces.RSAPublicKey;
+import java.security.spec.X509EncodedKeySpec;
 import java.util.List;
-import javax.crypto.SecretKey;
-import javax.crypto.spec.SecretKeySpec;
+import java.util.Base64;
+import java.util.stream.Stream;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.convert.converter.Converter;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
+import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.web.SecurityFilterChain;
+import java.security.KeyFactory;
 
 @Configuration
 @EnableWebSecurity
@@ -31,8 +37,9 @@ public class SecurityConfig {
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/actuator/health", "/auth/health").permitAll()
+                        .requestMatchers("/actuator/health", "/actuator/health/**", "/auth/health").permitAll()
                         .requestMatchers("/auth/login", "/auth/register", "/auth/refresh").permitAll()
+                        .requestMatchers("/oauth2/token", "/oauth2/jwks", "/.well-known/jwks.json").permitAll()
                         .requestMatchers("/auth/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtConverter)));
@@ -41,28 +48,39 @@ public class SecurityConfig {
     }
 
     @Bean
-    public JwtDecoder jwtDecoder(@Value("${jwt.secret}") String secret) {
-        byte[] keyBytes = normalizeSecret(secret).getBytes(StandardCharsets.UTF_8);
-        SecretKey key = new SecretKeySpec(keyBytes, "HmacSHA256");
-        return NimbusJwtDecoder.withSecretKey(key).build();
+    public JwtDecoder jwtDecoder(@Value("${jwt.public-key}") String publicKey) {
+        try {
+            byte[] decoded = Base64.getDecoder().decode(publicKey.replaceAll("\\s+", ""));
+            RSAPublicKey key = (RSAPublicKey) KeyFactory.getInstance("RSA")
+                    .generatePublic(new X509EncodedKeySpec(decoded));
+            return NimbusJwtDecoder.withPublicKey(key).build();
+        } catch (Exception ex) {
+            throw new IllegalStateException("Unable to configure RSA public key", ex);
+        }
     }
 
     @Bean
     public JwtAuthenticationConverter jwtAuthenticationConverter() {
         JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
-        converter.setJwtGrantedAuthoritiesConverter(jwt ->
-                List.of(new SimpleGrantedAuthority("ROLE_" + jwt.getClaimAsString("role"))));
+        converter.setJwtGrantedAuthoritiesConverter(compositeAuthoritiesConverter());
         return converter;
     }
 
-    private String normalizeSecret(String secret) {
-        if (secret.length() >= 32) {
-            return secret;
+    private Converter<Jwt, java.util.Collection<GrantedAuthority>> compositeAuthoritiesConverter() {
+        JwtGrantedAuthoritiesConverter scopeConverter = new JwtGrantedAuthoritiesConverter();
+        scopeConverter.setAuthorityPrefix("SCOPE_");
+        scopeConverter.setAuthoritiesClaimName("scope");
+        return jwt -> Stream.concat(
+                        scopeConverter.convert(jwt).stream(),
+                        roleAuthority(jwt).stream())
+                .toList();
+    }
+
+    private List<GrantedAuthority> roleAuthority(Jwt jwt) {
+        String role = jwt.getClaimAsString("role");
+        if (role == null || role.isBlank()) {
+            return List.of();
         }
-        StringBuilder builder = new StringBuilder(secret);
-        while (builder.length() < 32) {
-            builder.append(secret);
-        }
-        return builder.substring(0, 32);
+        return List.of(new SimpleGrantedAuthority("ROLE_" + role));
     }
 }

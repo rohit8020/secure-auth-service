@@ -11,22 +11,56 @@ spring:
     driver-class-name: com.mysql.cj.jdbc.Driver
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
+    open-in-view: false
     show-sql: false
     database-platform: org.hibernate.dialect.MySQLDialect
+  flyway:
+    enabled: true
 
 management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+  tracing:
+    sampling:
+      probability: 1.0
+  zipkin:
+    tracing:
+      endpoint: ${ZIPKIN_ENDPOINT:http://localhost:9411/api/v2/spans}
+
+logging:
+  structured:
+    format:
+      console: ecs
 
 jwt:
-  secret: ${JWT_SECRET:my-super-secret-key-that-is-at-least-32-characters}
+  private-key: ${JWT_PRIVATE_KEY:MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDf/N8a7nu2tv0iaK+O13bZ2Q2CPWLuvM59focSpQodjjW6+WxT2DtyxSDF5bY0ORa/ve1eBG2kzEhaidqq8fZL2lfvu1169KVzJTpzXVC2+dRA8SY9Xwt6nLGdp+Y2l7iPZgKuJog8CURY5d0bE55cf37VR2qFS5jZG9Efyu/rl8tgy0hIorOtLV4EvlT/6zhoZmYdkMkSBtfxdWn+UgDvIDZudThgjFr+CYR5wmLMV6h5+wm73kxDAGNREjCAYujhep482HXjIT0c44wr99D5KHxjmW5xfTHh9Bi3+pWZMrWZIP6s9FQQi5qsKrNzI0JbN5riVoNRpNS8zd2HL/9lAgMBAAECggEAEoU4lw6SPP18nkWngykxNa+duepkqFwFEI7aUSduLUXxjubUocp+wI1orucAzb4iXFMyZzmjWEL065mQ8rK5kbQ5h67HerpzsLrquO3FwK9qcRPk0c0ZUveAXzUUvb2wqsNoTtPhpAyEcdD7MI6Kzlf+GdlYcdzvmT9p0gC9cvkX66h22Dq5eu3Cs2tUOnPaI9idySwotgV3o5k61mX4+ZxR/VV2hZmw5pLE7Gvc5QUhkNtLpg2Mk7UIIadZ7gD9oQa0y6IoRXaKJcByOlpBVpc6hfEvheFO/ww3WhQIMeBQ5v/JJMxAgLO7aaNjcZb4svGvwgjtcT/mG1HifZ3reQKBgQD8Riwr7+hiEqj2TDCSGEPJTa7AoAFGdlds6ngyZFmp4DhSzPIupiHLfcyDG2m8teqd0rpuhbrRkevl0WaQ0gAOj0uXPUm+V3t5k2b920MVeEmMtLlO5xO7+tryLV+yCp0QCTB4vADUmchfsIg4crloI1k0AtFB5SNMox2+jA5O/QKBgQDjS8AtDqEpERRAK8J27DOCgOjBjOKkS3/Yg+QhfXfzTZDuiFaOA62r7JRhIXYn9xBgYNhHt/M1J78gtfTEG4zbPc9/MniDis5b7PtBeVa5TFWtaAzLyBYbqGPraH93wlpyg6jZuIaPQbbwKm7qflpFxrzWtzzv6E2Uh8cc+BzCiQKBgQDsuAwKznuIS2owcx3AePRimHo6VencbH9svDc9UdyxAqzXRWibTVi40bpt6/M0GJ+mqG4391RuAjcQ14Uer29OOjf8Go5wBTbfxekGnBA+vTiGx65602o5IhMA3ILHVh47ReQt5nwBAqx63fN0xHIlvcWegGZLJvAQoZ7vhgyHIQKBgGThNv8IcjDG2sUMZvffJ5FxY1ycCe8/bxOKnhLbHATJVVz49+l56nfWvZhKgKWGOyd7dCKImxHpfSOofmUXkTGxQknC/cfsMGCOUomhsAL3xUL8XkmHmYBXAVn2/DQL95bBpoxTIK2uTeJUAvxibfBwH1nw48Pax6v3g0DxQdp5AoGBAME4wY9MtrKR/mKUwXYEjU+MxHlWPwm/7LPU/oMDHAcLDeuPorTsn6C9kzNr3LKULGUNwHcRfyQeBlgS/3eeQ6RGeDzW9DA5bQW4xyrVquFV9/EssxTEwxxffO0LKSuHBWzft6Qs7l32DFVonE1rkkbWbgtbkxh3PFuyLjAHp8ar}
+  public-key: ${JWT_PUBLIC_KEY:MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA3/zfGu57trb9Imivjtd22dkNgj1i7rzOfX6HEqUKHY41uvlsU9g7csUgxeW2NDkWv73tXgRtpMxIWonaqvH2S9pX77tdevSlcyU6c11QtvnUQPEmPV8LepyxnafmNpe4j2YCriaIPAlEWOXdGxOeXH9+1UdqhUuY2RvRH8rv65fLYMtISKKzrS1eBL5U/+s4aGZmHZDJEgbX8XVp/lIA7yA2bnU4YIxa/gmEecJizFeoefsJu95MQwBjURIwgGLo4XqePNh14yE9HOOMK/fQ+Sh8Y5lucX0x4fQYt/qVmTK1mSD+rPRUEIuarCqzcyNCWzea4laDUaTUvM3dhy//ZQIDAQAB}
+  key-id: ${JWT_KEY_ID:auth-service-rsa-key}
+  issuer: ${JWT_ISSUER:http://auth-service:8081}
   expiration: ${JWT_EXPIRATION:3600000}
   refresh-expiration: ${JWT_REFRESH_EXPIRATION:86400000}
+  client-expiration: ${JWT_CLIENT_EXPIRATION:300000}
 
 app:
   bootstrap-admin:
     username: ${BOOTSTRAP_ADMIN_USERNAME:admin}
     password: ${BOOTSTRAP_ADMIN_PASSWORD:Admin@12345}
+  service-auth:
+    clients:
+      - client-id: ${CLAIMS_CLIENT_ID:claims-service}
+        client-secret: ${CLAIMS_CLIENT_SECRET:claims-service-secret}
+        scopes:
+          - policy.projection.read

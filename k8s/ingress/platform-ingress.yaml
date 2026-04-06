@@ -2,7 +2,13 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: insurance-platform-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
 spec:
+  tls:
+    - hosts:
+        - insurance.local
+      secretName: insurance-platform-tls
   rules:
     - host: insurance.local
       http:

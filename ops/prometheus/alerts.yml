@@ -1,0 +1,56 @@
+groups:
+  - name: insurance-platform
+    rules:
+      - alert: ServiceDown
+        expr: up{job=~"auth-service|policy-service|claims-service|api-gateway"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: Service is down
+          description: "{{ $labels.job }} has been unreachable for more than 2 minutes."
+
+      - alert: HighGatewayLatency
+        expr: histogram_quantile(0.95, sum by (le, application) (rate(http_server_requests_seconds_bucket{application="api-gateway"}[5m]))) > 0.5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Gateway p95 latency is elevated
+          description: "api-gateway p95 latency has been above 500ms for at least 10 minutes."
+
+      - alert: OutboxBacklogGrowing
+        expr: sum(outbox_events_ready{service=~"policy-service|claims-service"}) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Outbox backlog is not draining
+          description: "Transactional outbox backlog has remained non-zero for at least 10 minutes."
+
+      - alert: OutboxFailuresPresent
+        expr: sum(outbox_events_failed{service=~"policy-service|claims-service"}) > 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: Failed outbox events detected
+          description: "At least one outbox event is stuck in FAILED state."
+
+      - alert: HikariPoolSaturation
+        expr: max by (application) (hikaricp_connections_active{application=~"auth-service|policy-service|claims-service"} / clamp_min(hikaricp_connections_max{application=~"auth-service|policy-service|claims-service"}, 1)) > 0.8
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Connection pool saturation is high
+          description: "{{ $labels.application }} has sustained database pool usage above 80%."
+
+      - alert: PolicyClientCircuitBreakerOpen
+        expr: resilience4j_circuitbreaker_state{name="policy-service",state="open"} == 1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: Policy service circuit breaker is open
+          description: "The policy-service circuit breaker has remained open for at least 5 minutes."

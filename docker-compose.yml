@@ -8,6 +8,8 @@ services:
       MYSQL_ROOT_PASSWORD: Root@123Password!
     ports:
       - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h localhost -pRoot@123Password!"]
       interval: 10s
@@ -17,13 +19,16 @@ services:
   postgres:
     image: postgres:16
     environment:
-      POSTGRES_DB: policydb
+      POSTGRES_DB: postgres
       POSTGRES_USER: policy_user
       POSTGRES_PASSWORD: Policy@123Password!
     ports:
       - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./ops/postgres/init/01-create-service-databases.sql:/docker-entrypoint-initdb.d/01-create-service-databases.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U policy_user -d policydb"]
+      test: ["CMD-SHELL", "pg_isready -U policy_user -d postgres"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -33,13 +38,20 @@ services:
     command: ["redis-server", "--appendonly", "yes"]
     ports:
       - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
   kafka:
-    image: bitnamilegacy/kafka:latest
+    image: bitnami/kafka:3.9
     ports:
       - "9092:9092"
     environment:
-      KAFKA_CLUSTER_ID: abcdefghijklmnopqrstuv
+      KAFKA_KRAFT_CLUSTER_ID: abcdefghijklmnopqrstuv
       KAFKA_CFG_NODE_ID: 1
       KAFKA_CFG_PROCESS_ROLES: broker,controller
       KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
@@ -58,7 +70,44 @@ services:
       timeout: 10s
       retries: 10
 
+  zipkin:
+    image: openzipkin/zipkin:3
+    ports:
+      - "9411:9411"
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./ops/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./ops/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+    depends_on:
+      auth-service:
+        condition: service_started
+      policy-service:
+        condition: service_started
+      claims-service:
+        condition: service_started
+      api-gateway:
+        condition: service_started
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: Admin@12345
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./ops/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+    depends_on:
+      prometheus:
+        condition: service_started
+
   auth-service:
+    image: secure-auth-service/auth-service:local
     build:
       context: .
       dockerfile: services/auth-service/Dockerfile
@@ -67,11 +116,12 @@ services:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/authdb?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
       SPRING_DATASOURCE_USERNAME: auth_user
       SPRING_DATASOURCE_PASSWORD: Auth@123Password!
-      JWT_SECRET: my-super-secret-key-that-is-at-least-32-characters
-      JWT_EXPIRATION: 3600000
-      JWT_REFRESH_EXPIRATION: 86400000
       BOOTSTRAP_ADMIN_USERNAME: admin
       BOOTSTRAP_ADMIN_PASSWORD: Admin@12345
+      JWT_ISSUER: http://auth-service:8081
+      CLAIMS_CLIENT_ID: claims-service
+      CLAIMS_CLIENT_SECRET: claims-service-secret
+      ZIPKIN_ENDPOINT: http://zipkin:9411/api/v2/spans
     ports:
       - "8081:8081"
     depends_on:
@@ -79,6 +129,7 @@ services:
         condition: service_healthy
 
   policy-service:
+    image: secure-auth-service/policy-service:local
     build:
       context: .
       dockerfile: services/policy-service/Dockerfile
@@ -88,9 +139,9 @@ services:
       SPRING_DATASOURCE_USERNAME: policy_user
       SPRING_DATASOURCE_PASSWORD: Policy@123Password!
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-      JWT_SECRET: my-super-secret-key-that-is-at-least-32-characters
-      INTERNAL_API_KEY: internal-shared-key
-      POLICY_EVENTS_TOPIC: policy-events
+      AUTH_JWK_SET_URI: http://auth-service:8081/oauth2/jwks
+      POLICY_EVENTS_TOPIC: policy-events.v1
+      ZIPKIN_ENDPOINT: http://zipkin:9411/api/v2/spans
     ports:
       - "8082:8082"
     depends_on:
@@ -98,32 +149,48 @@ services:
         condition: service_healthy
       kafka:
         condition: service_healthy
+      auth-service:
+        condition: service_started
 
   claims-service:
+    image: secure-auth-service/claims-service:local
     build:
       context: .
       dockerfile: services/claims-service/Dockerfile
     environment:
       SERVER_PORT: 8083
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/claimsdb?currentSchema=claims_service
+      SPRING_DATASOURCE_USERNAME: policy_user
+      SPRING_DATASOURCE_PASSWORD: Policy@123Password!
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-      JWT_SECRET: my-super-secret-key-that-is-at-least-32-characters
+      AUTH_JWK_SET_URI: http://auth-service:8081/oauth2/jwks
+      AUTH_SERVICE_BASE_URL: http://auth-service:8081
+      AUTH_CLIENT_ID: claims-service
+      AUTH_CLIENT_SECRET: claims-service-secret
       POLICY_SERVICE_BASE_URL: http://policy-service:8082
-      INTERNAL_API_KEY: internal-shared-key
-      POLICY_EVENTS_TOPIC: policy-events
-      CLAIM_EVENTS_TOPIC: claim-events
+      POLICY_EVENTS_TOPIC: policy-events.v1
+      CLAIM_EVENTS_TOPIC: claim-events.v1
+      POLICY_EVENTS_DLQ_TOPIC: policy-events.DLQ
+      CLAIM_EVENTS_DLQ_TOPIC: claim-events.DLQ
+      ZIPKIN_ENDPOINT: http://zipkin:9411/api/v2/spans
     ports:
       - "8083:8083"
     depends_on:
+      postgres:
+        condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
       kafka:
         condition: service_healthy
+      auth-service:
+        condition: service_started
       policy-service:
         condition: service_started
 
   api-gateway:
+    image: secure-auth-service/api-gateway:local
     build:
       context: .
       dockerfile: services/api-gateway/Dockerfile
@@ -134,17 +201,24 @@ services:
       AUTH_SERVICE_URL: http://auth-service:8081
       POLICY_SERVICE_URL: http://policy-service:8082
       CLAIMS_SERVICE_URL: http://claims-service:8083
-      JWT_SECRET: my-super-secret-key-that-is-at-least-32-characters
+      AUTH_JWK_SET_URI: http://auth-service:8081/oauth2/jwks
       LOGIN_RATE_LIMIT: 10
       CLAIM_SUBMIT_RATE_LIMIT: 20
+      ZIPKIN_ENDPOINT: http://zipkin:9411/api/v2/spans
     ports:
       - "8080:8080"
     depends_on:
       redis:
-        condition: service_started
+        condition: service_healthy
       auth-service:
         condition: service_started
       policy-service:
         condition: service_started
       claims-service:
         condition: service_started
+
+volumes:
+  mysql-data:
+  postgres-data:
+  redis-data:
+  grafana-data:

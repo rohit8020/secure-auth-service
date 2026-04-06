@@ -7,4 +7,8 @@ data:
   SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/policydb
   SPRING_DATASOURCE_USERNAME: policy_user
   SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-  POLICY_EVENTS_TOPIC: policy-events
+  AUTH_JWK_SET_URI: http://auth-service:8081/oauth2/jwks
+  POLICY_EVENTS_TOPIC: policy-events.v1
+  OUTBOX_BATCH_SIZE: "25"
+  OUTBOX_FIXED_DELAY_MS: "5000"
+  ZIPKIN_ENDPOINT: http://zipkin:9411/api/v2/spans

@@ -4,14 +4,16 @@ import com.rohit8020.policyservice.dto.IssuePolicyRequest;
 import com.rohit8020.policyservice.dto.PolicyResponse;
 import com.rohit8020.policyservice.dto.RenewPolicyRequest;
 import com.rohit8020.policyservice.service.PolicyService;
+import com.rohit8020.platformcommon.api.PagedResponse;
 import jakarta.validation.Valid;
-import java.util.List;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -27,8 +29,9 @@ public class PolicyController {
 
     @PostMapping
     public ResponseEntity<PolicyResponse> issuePolicy(@Valid @RequestBody IssuePolicyRequest request,
+                                                      @RequestHeader("Idempotency-Key") String idempotencyKey,
                                                       Authentication authentication) {
-        return ResponseEntity.ok(policyService.issuePolicy(authentication, request));
+        return ResponseEntity.ok(policyService.issuePolicy(authentication, request, idempotencyKey));
     }
 
     @PostMapping("/{policyId}/renew")
@@ -51,7 +54,11 @@ public class PolicyController {
     }
 
     @GetMapping
-    public ResponseEntity<List<PolicyResponse>> listPolicies(Authentication authentication) {
-        return ResponseEntity.ok(policyService.listPolicies(authentication));
+    public ResponseEntity<PagedResponse<PolicyResponse>> listPolicies(Authentication authentication,
+                                                                      @RequestParam(defaultValue = "0") int page,
+                                                                      @RequestParam(defaultValue = "20") int size,
+                                                                      @RequestParam(defaultValue = "createdAt,desc")
+                                                                      String sort) {
+        return ResponseEntity.ok(policyService.listPolicies(authentication, page, size, sort));
     }
 }

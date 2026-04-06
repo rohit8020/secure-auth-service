@@ -9,5 +9,7 @@ data:
   AUTH_SERVICE_URL: http://auth-service:8081
   POLICY_SERVICE_URL: http://policy-service:8082
   CLAIMS_SERVICE_URL: http://claims-service:8083
+  AUTH_JWK_SET_URI: http://auth-service:8081/oauth2/jwks
   LOGIN_RATE_LIMIT: "10"
   CLAIM_SUBMIT_RATE_LIMIT: "20"
+  ZIPKIN_ENDPOINT: http://zipkin:9411/api/v2/spans

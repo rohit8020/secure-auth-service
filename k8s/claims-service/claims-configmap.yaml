@@ -4,9 +4,22 @@ metadata:
   name: claims-config
 data:
   SERVER_PORT: "8083"
+  SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/claimsdb?currentSchema=claims_service
+  SPRING_DATASOURCE_USERNAME: policy_user
   SPRING_DATA_REDIS_HOST: redis
   SPRING_DATA_REDIS_PORT: "6379"
   SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-  POLICY_EVENTS_TOPIC: policy-events
-  CLAIM_EVENTS_TOPIC: claim-events
+  AUTH_JWK_SET_URI: http://auth-service:8081/oauth2/jwks
+  AUTH_SERVICE_BASE_URL: http://auth-service:8081
+  AUTH_CLIENT_ID: claims-service
+  AUTH_CLIENT_SCOPE: policy.projection.read
   POLICY_SERVICE_BASE_URL: http://policy-service:8082
+  POLICY_SERVICE_CONNECT_TIMEOUT_MS: "2000"
+  POLICY_SERVICE_READ_TIMEOUT_MS: "3000"
+  POLICY_EVENTS_TOPIC: policy-events.v1
+  CLAIM_EVENTS_TOPIC: claim-events.v1
+  POLICY_EVENTS_DLQ_TOPIC: policy-events.DLQ
+  CLAIM_EVENTS_DLQ_TOPIC: claim-events.DLQ
+  OUTBOX_BATCH_SIZE: "25"
+  OUTBOX_FIXED_DELAY_MS: "5000"
+  ZIPKIN_ENDPOINT: http://zipkin:9411/api/v2/spans

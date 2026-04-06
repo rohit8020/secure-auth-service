@@ -1,28 +1,42 @@
 package com.rohit8020.claimsservice.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rohit8020.claimsservice.dto.ClaimDecisionRequest;
 import com.rohit8020.claimsservice.dto.ClaimResponse;
 import com.rohit8020.claimsservice.dto.PolicyProjectionResponse;
 import com.rohit8020.claimsservice.dto.SubmitClaimRequest;
 import com.rohit8020.claimsservice.entity.ClaimRecord;
 import com.rohit8020.claimsservice.entity.ClaimStatus;
+import com.rohit8020.claimsservice.entity.IdempotencyRecord;
+import com.rohit8020.claimsservice.entity.OutboxEvent;
+import com.rohit8020.claimsservice.entity.OutboxStatus;
 import com.rohit8020.claimsservice.entity.PolicyProjection;
 import com.rohit8020.claimsservice.entity.UserRole;
-import com.rohit8020.claimsservice.event.ClaimEvent;
-import com.rohit8020.claimsservice.event.PolicyEvent;
 import com.rohit8020.claimsservice.exception.ApiException;
 import com.rohit8020.claimsservice.repository.ClaimRepository;
+import com.rohit8020.claimsservice.repository.IdempotencyRecordRepository;
+import com.rohit8020.claimsservice.repository.OutboxEventRepository;
 import com.rohit8020.claimsservice.repository.PolicyProjectionRepository;
 import com.rohit8020.claimsservice.security.AuthenticatedActor;
 import com.rohit8020.claimsservice.security.SecurityUtils;
+import com.rohit8020.platformcommon.api.PagedResponse;
+import com.rohit8020.platformcommon.event.AggregateType;
+import com.rohit8020.platformcommon.event.ClaimEventPayload;
+import com.rohit8020.platformcommon.event.DomainEvent;
+import com.rohit8020.platformcommon.event.PolicyEventPayload;
+import java.security.MessageDigest;
 import java.time.Instant;
-import java.util.List;
+import java.util.HexFormat;
 import java.util.Optional;
 import java.util.UUID;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.kafka.annotation.KafkaListener;
-import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 
@@ -31,29 +45,49 @@ public class ClaimsService {
 
     private final ClaimRepository claimRepository;
     private final PolicyProjectionRepository policyProjectionRepository;
+    private final IdempotencyRecordRepository idempotencyRecordRepository;
+    private final OutboxEventRepository outboxEventRepository;
     private final SecurityUtils securityUtils;
     private final PolicyProjectionClient policyProjectionClient;
-    private final KafkaTemplate<String, ClaimEvent> kafkaTemplate;
-    private final String claimTopic;
+    private final PolicyProjectionCache policyProjectionCache;
+    private final ObjectMapper objectMapper;
 
     public ClaimsService(ClaimRepository claimRepository,
                          PolicyProjectionRepository policyProjectionRepository,
+                         IdempotencyRecordRepository idempotencyRecordRepository,
+                         OutboxEventRepository outboxEventRepository,
                          SecurityUtils securityUtils,
                          PolicyProjectionClient policyProjectionClient,
-                         KafkaTemplate<String, ClaimEvent> kafkaTemplate,
-                         @Value("${app.kafka.claim-topic}") String claimTopic) {
+                         PolicyProjectionCache policyProjectionCache,
+                         ObjectMapper objectMapper) {
         this.claimRepository = claimRepository;
         this.policyProjectionRepository = policyProjectionRepository;
+        this.idempotencyRecordRepository = idempotencyRecordRepository;
+        this.outboxEventRepository = outboxEventRepository;
         this.securityUtils = securityUtils;
         this.policyProjectionClient = policyProjectionClient;
-        this.kafkaTemplate = kafkaTemplate;
-        this.claimTopic = claimTopic;
+        this.policyProjectionCache = policyProjectionCache;
+        this.objectMapper = objectMapper;
     }
 
-    public ClaimResponse submit(Authentication authentication, SubmitClaimRequest request) {
+    public ClaimResponse submit(Authentication authentication,
+                                SubmitClaimRequest request,
+                                String idempotencyKey) {
         AuthenticatedActor actor = securityUtils.currentActor(authentication);
         if (actor.role() != UserRole.POLICYHOLDER) {
             throw new ApiException(HttpStatus.FORBIDDEN, "Only policyholders can submit claims");
+        }
+
+        String requestHash = hashRequest(request);
+        IdempotencyRecord existing = idempotencyRecordRepository
+                .findByOperationAndActorIdAndIdempotencyKey("SUBMIT_CLAIM", actor.userId(), idempotencyKey)
+                .orElse(null);
+        if (existing != null) {
+            if (!existing.getRequestHash().equals(requestHash)) {
+                throw new ApiException(HttpStatus.CONFLICT,
+                        "Idempotency key has already been used with a different request");
+            }
+            return deserialize(existing.getResponseBody(), ClaimResponse.class);
         }
 
         PolicyProjection projection = ensureProjection(request.policyId());
@@ -72,12 +106,12 @@ public class ClaimsService {
         claim.setDescription(request.description());
         claim.setClaimAmount(request.claimAmount());
         claim.setStatus(ClaimStatus.SUBMITTED);
-        claim.setCreatedAt(Instant.now());
-        claim.setUpdatedAt(Instant.now());
-        claimRepository.save(claim);
+        ClaimRecord saved = claimRepository.save(claim);
 
-        publish(claim, "CLAIM_SUBMITTED", actor);
-        return map(claim);
+        persistOutboxEvent(saved, "CLAIM_SUBMITTED", actor);
+        ClaimResponse response = map(saved);
+        persistIdempotencyRecord("SUBMIT_CLAIM", actor.userId(), idempotencyKey, requestHash, response, response.id());
+        return response;
     }
 
     public ClaimResponse verify(Authentication authentication, String claimId, ClaimDecisionRequest request) {
@@ -99,11 +133,10 @@ public class ClaimsService {
 
         claim.setStatus(ClaimStatus.VERIFIED);
         claim.setDecisionNotes(request == null ? null : request.notes());
-        claim.setUpdatedAt(Instant.now());
-        claimRepository.save(claim);
+        ClaimRecord saved = claimRepository.save(claim);
 
-        publish(claim, "CLAIM_VERIFIED", actor);
-        return map(claim);
+        persistOutboxEvent(saved, "CLAIM_VERIFIED", actor);
+        return map(saved);
     }
 
     public ClaimResponse approve(Authentication authentication, String claimId, ClaimDecisionRequest request) {
@@ -119,26 +152,44 @@ public class ClaimsService {
         return map(findAccessibleClaim(actor, claimId));
     }
 
-    public List<ClaimResponse> list(Authentication authentication) {
+    public PagedResponse<ClaimResponse> list(Authentication authentication, int page, int size, String sort) {
         AuthenticatedActor actor = securityUtils.currentActor(authentication);
-        return switch (actor.role()) {
-            case ADMIN -> streamAll();
-            case AGENT -> claimRepository.findAllByAssignedAgentId(actor.userId()).stream().map(this::map).toList();
-            case POLICYHOLDER -> claimRepository.findAllByPolicyholderId(actor.userId()).stream().map(this::map).toList();
+        Pageable pageable = PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), 100), parseSort(sort));
+        Page<ClaimRecord> results = switch (actor.role()) {
+            case ADMIN -> claimRepository.findAll(pageable);
+            case AGENT -> claimRepository.findAllByAssignedAgentId(actor.userId(), pageable);
+            case POLICYHOLDER -> claimRepository.findAllByPolicyholderId(actor.userId(), pageable);
         };
+
+        return new PagedResponse<>(
+                results.stream().map(this::map).toList(),
+                results.getNumber(),
+                results.getSize(),
+                results.getTotalElements(),
+                results.getTotalPages(),
+                sort
+        );
     }
 
-    @KafkaListener(topics = "${app.kafka.policy-topic}", groupId = "${spring.kafka.consumer.group-id:claims-service}")
-    public void handlePolicyEvent(PolicyEvent event) {
-        PolicyProjection projection = policyProjectionRepository.findById(event.aggregateId())
-                .orElseGet(PolicyProjection::new);
-        projection.setId(event.aggregateId());
-        projection.setPolicyholderId(event.policyholderId());
-        projection.setAssignedAgentId(event.assignedAgentId());
-        projection.setStatus(event.status());
-        projection.setClaimable(!"LAPSED".equals(event.status()));
-        projection.setUpdatedAt(Instant.now());
-        policyProjectionRepository.save(projection);
+    @KafkaListener(topics = "${app.kafka.policy-topic}",
+            groupId = "${spring.kafka.consumer.group-id:claims-service}",
+            containerFactory = "domainEventKafkaListenerContainerFactory")
+    public void handlePolicyEvent(DomainEvent event, Acknowledgment acknowledgment) {
+        try {
+            PolicyEventPayload payload = objectMapper.treeToValue(event.payload(), PolicyEventPayload.class);
+            PolicyProjection projection = policyProjectionRepository.findById(event.aggregateId())
+                    .orElseGet(PolicyProjection::new);
+            projection.setId(event.aggregateId());
+            projection.setPolicyholderId(payload.policyholderId());
+            projection.setAssignedAgentId(payload.assignedAgentId());
+            projection.setStatus(payload.status());
+            projection.setClaimable(!"LAPSED".equals(payload.status()));
+            PolicyProjection saved = policyProjectionRepository.save(projection);
+            policyProjectionCache.put(saved);
+            acknowledgment.acknowledge();
+        } catch (Exception ex) {
+            throw new IllegalStateException("Unable to process policy event " + event.eventId(), ex);
+        }
     }
 
     private ClaimResponse decide(Authentication authentication,
@@ -161,11 +212,10 @@ public class ClaimsService {
 
         claim.setStatus(targetStatus);
         claim.setDecisionNotes(request == null ? null : request.notes());
-        claim.setUpdatedAt(Instant.now());
-        claimRepository.save(claim);
+        ClaimRecord saved = claimRepository.save(claim);
 
-        publish(claim, eventType, actor);
-        return map(claim);
+        persistOutboxEvent(saved, eventType, actor);
+        return map(saved);
     }
 
     private ClaimRecord findAccessibleClaim(AuthenticatedActor actor, String claimId) {
@@ -186,6 +236,7 @@ public class ClaimsService {
     private PolicyProjection ensureProjection(String policyId) {
         Optional<PolicyProjection> existing = policyProjectionRepository.findById(policyId);
         if (existing.isPresent()) {
+            policyProjectionCache.put(existing.get());
             return existing.get();
         }
 
@@ -196,29 +247,51 @@ public class ClaimsService {
         projection.setAssignedAgentId(response.assignedAgentId());
         projection.setStatus(response.status());
         projection.setClaimable(response.claimable());
-        projection.setUpdatedAt(Instant.now());
-        return policyProjectionRepository.save(projection);
+        PolicyProjection saved = policyProjectionRepository.save(projection);
+        policyProjectionCache.put(saved);
+        return saved;
     }
 
-    private void publish(ClaimRecord claim, String eventType, AuthenticatedActor actor) {
-        kafkaTemplate.send(claimTopic, claim.getId(), new ClaimEvent(
-                claim.getId(),
+    private void persistOutboxEvent(ClaimRecord claim, String eventType, AuthenticatedActor actor) {
+        ClaimEventPayload payload = new ClaimEventPayload(
                 claim.getPolicyId(),
                 claim.getPolicyholderId(),
                 claim.getAssignedAgentId(),
-                eventType,
                 claim.getStatus().name(),
                 actor.userId(),
                 actor.role().name(),
-                Instant.now(),
                 claim.getClaimAmount()
-        ));
+        );
+
+        OutboxEvent event = new OutboxEvent();
+        event.setId(UUID.randomUUID().toString());
+        event.setAggregateType(AggregateType.CLAIM);
+        event.setAggregateId(claim.getId());
+        event.setEventType(eventType);
+        event.setEventVersion(1);
+        event.setPayload(writeJson(payload));
+        event.setStatus(OutboxStatus.PENDING);
+        event.setRetryCount(0);
+        event.setAvailableAt(Instant.now());
+        outboxEventRepository.save(event);
     }
 
-    private List<ClaimResponse> streamAll() {
-        java.util.ArrayList<ClaimResponse> responses = new java.util.ArrayList<>();
-        claimRepository.findAll().forEach(claim -> responses.add(map(claim)));
-        return responses;
+    private void persistIdempotencyRecord(String operation,
+                                          Long actorId,
+                                          String idempotencyKey,
+                                          String requestHash,
+                                          ClaimResponse response,
+                                          String resourceId) {
+        IdempotencyRecord record = new IdempotencyRecord();
+        record.setOperation(operation);
+        record.setActorId(actorId);
+        record.setIdempotencyKey(idempotencyKey);
+        record.setRequestHash(requestHash);
+        record.setResponseStatus(HttpStatus.OK.value());
+        record.setResponseBody(writeJson(response));
+        record.setResourceId(resourceId);
+        record.setExpiresAt(Instant.now().plusSeconds(24 * 60 * 60));
+        idempotencyRecordRepository.save(record);
     }
 
     private ClaimResponse map(ClaimRecord claim) {
@@ -234,5 +307,38 @@ public class ClaimsService {
                 claim.getCreatedAt(),
                 claim.getUpdatedAt()
         );
+    }
+
+    private String hashRequest(Object request) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            return HexFormat.of().formatHex(digest.digest(objectMapper.writeValueAsBytes(request)));
+        } catch (Exception ex) {
+            throw new IllegalStateException("Unable to hash request", ex);
+        }
+    }
+
+    private String writeJson(Object payload) {
+        try {
+            return objectMapper.writeValueAsString(payload);
+        } catch (JsonProcessingException ex) {
+            throw new IllegalStateException("Unable to serialize payload", ex);
+        }
+    }
+
+    private <T> T deserialize(String payload, Class<T> targetType) {
+        try {
+            return objectMapper.readValue(payload, targetType);
+        } catch (JsonProcessingException ex) {
+            throw new IllegalStateException("Unable to deserialize idempotent response", ex);
+        }
+    }
+
+    private Sort parseSort(String sort) {
+        String[] parts = sort.split(",", 2);
+        Sort.Direction direction = parts.length > 1
+                ? Sort.Direction.fromOptionalString(parts[1]).orElse(Sort.Direction.DESC)
+                : Sort.Direction.DESC;
+        return Sort.by(direction, parts[0]);
     }
 }

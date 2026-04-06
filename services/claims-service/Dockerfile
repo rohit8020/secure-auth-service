@@ -3,6 +3,7 @@ FROM maven:3.9.9-eclipse-temurin-17 AS build
 WORKDIR /workspace
 
 COPY pom.xml .
+COPY services/platform-common/pom.xml services/platform-common/pom.xml
 COPY services/auth-service/pom.xml services/auth-service/pom.xml
 COPY services/policy-service/pom.xml services/policy-service/pom.xml
 COPY services/claims-service/pom.xml services/claims-service/pom.xml

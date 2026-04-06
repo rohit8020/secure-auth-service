@@ -5,6 +5,10 @@ on:
     branches: [main, dev]
   pull_request:
 
+concurrency:
+  group: ci-cd-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-test-smoke:
     runs-on: ubuntu-latest
@@ -27,8 +31,60 @@ jobs:
       - name: Maven tests
         run: ./mvnw -q test
 
+      - name: Validate Compose config
+        run: docker compose config --quiet
+
       - name: Docker Compose build
         run: docker compose build
+
+      - name: Generate SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          path: .
+          format: cyclonedx-json
+          output-file: sbom.cyclonedx.json
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-cyclonedx
+          path: sbom.cyclonedx.json
+
+      - name: Trivy scan auth-service image
+        uses: aquasecurity/trivy-action@0.31.0
+        with:
+          image-ref: secure-auth-service/auth-service:local
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          severity: CRITICAL,HIGH
+
+      - name: Trivy scan policy-service image
+        uses: aquasecurity/trivy-action@0.31.0
+        with:
+          image-ref: secure-auth-service/policy-service:local
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          severity: CRITICAL,HIGH
+
+      - name: Trivy scan claims-service image
+        uses: aquasecurity/trivy-action@0.31.0
+        with:
+          image-ref: secure-auth-service/claims-service:local
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          severity: CRITICAL,HIGH
+
+      - name: Trivy scan api-gateway image
+        uses: aquasecurity/trivy-action@0.31.0
+        with:
+          image-ref: secure-auth-service/api-gateway:local
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          severity: CRITICAL,HIGH
 
       - name: Docker Compose up
         run: docker compose up -d

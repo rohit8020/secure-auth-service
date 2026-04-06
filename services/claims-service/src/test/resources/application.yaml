@@ -1,14 +1,42 @@
 spring:
+  task:
+    scheduling:
+      enabled: false
+  datasource:
+    url: jdbc:h2:mem:claimsdb;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;INIT=CREATE SCHEMA IF NOT EXISTS claims_service\;SET SCHEMA claims_service;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        default_schema: claims_service
+  flyway:
+    enabled: true
+    default-schema: claims_service
+    create-schemas: true
   data:
     redis:
       host: localhost
       port: 6379
+      repositories:
+        enabled: false
   kafka:
     bootstrap-servers: localhost:9092
     consumer:
       group-id: claims-service-test
+      properties:
+        spring.json.trusted.packages: com.rohit8020.platformcommon.event
+        spring.json.value.default.type: com.rohit8020.platformcommon.event.DomainEvent
     listener:
       auto-startup: false
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: http://localhost:8081/oauth2/jwks
 
 management:
   health:
@@ -17,13 +45,20 @@ management:
     kafka:
       enabled: false
 
-jwt:
-  secret: test-super-secret-key-that-is-at-least-32-characters
-
 app:
   kafka:
-    policy-topic: policy-events
-    claim-topic: claim-events
+    policy-topic: policy-events.v1
+    claim-topic: claim-events.v1
+    policy-dlq-topic: policy-events.DLQ
+    claim-dlq-topic: claim-events.DLQ
+  outbox:
+    enabled: false
+  auth-service:
+    base-url: http://localhost:8081
+    client-id: claims-service
+    client-secret: claims-service-secret
+    scope: policy.projection.read
   policy-service:
     base-url: http://localhost:8082
-    internal-api-key: internal-shared-key
+    connect-timeout-ms: 500
+    read-timeout-ms: 500

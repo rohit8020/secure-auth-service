@@ -19,6 +19,7 @@
     <description>Insurance microservices monorepo</description>
 
     <modules>
+        <module>services/platform-common</module>
         <module>services/auth-service</module>
         <module>services/policy-service</module>
         <module>services/claims-service</module>

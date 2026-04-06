@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: policy-service
 spec:
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
       app: policy-service
@@ -18,44 +18,37 @@ spec:
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8082
+          envFrom:
+            - configMapRef:
+                name: policy-config
           env:
-            - name: SERVER_PORT
-              valueFrom:
-                configMapKeyRef:
-                  name: policy-config
-                  key: SERVER_PORT
-            - name: SPRING_DATASOURCE_URL
-              valueFrom:
-                configMapKeyRef:
-                  name: policy-config
-                  key: SPRING_DATASOURCE_URL
-            - name: SPRING_DATASOURCE_USERNAME
-              valueFrom:
-                configMapKeyRef:
-                  name: policy-config
-                  key: SPRING_DATASOURCE_USERNAME
             - name: SPRING_DATASOURCE_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: postgres-secret
                   key: POSTGRES_PASSWORD
-            - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
-              valueFrom:
-                configMapKeyRef:
-                  name: policy-config
-                  key: SPRING_KAFKA_BOOTSTRAP_SERVERS
-            - name: JWT_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: auth-secret
-                  key: JWT_SECRET
-            - name: INTERNAL_API_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: auth-secret
-                  key: INTERNAL_API_KEY
-            - name: POLICY_EVENTS_TOPIC
-              valueFrom:
-                configMapKeyRef:
-                  name: policy-config
-                  key: POLICY_EVENTS_TOPIC
+          startupProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8082
+            periodSeconds: 10
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8082
+            periodSeconds: 10
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8082
+            periodSeconds: 20
+            timeoutSeconds: 3
+          resources:
+            requests:
+              cpu: 200m
+              memory: 384Mi
+            limits:
+              cpu: 750m
+              memory: 768Mi
