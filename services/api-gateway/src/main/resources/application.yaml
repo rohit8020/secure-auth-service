@@ -19,25 +19,27 @@ spring:
     compatibility-verifier:
       enabled: false
     gateway:
-      routes:
-        - id: auth-service
-          uri: ${AUTH_SERVICE_URL:http://localhost:8081}
-          predicates:
-            - Path=/api/auth/**
-          filters:
-            - RewritePath=/api/auth(?<segment>/?.*), /auth$\{segment}
-        - id: policy-service
-          uri: ${POLICY_SERVICE_URL:http://localhost:8082}
-          predicates:
-            - Path=/api/policies/**
-          filters:
-            - RewritePath=/api/policies(?<segment>/?.*), /policies$\{segment}
-        - id: claims-service
-          uri: ${CLAIMS_SERVICE_URL:http://localhost:8083}
-          predicates:
-            - Path=/api/claims/**
-          filters:
-            - RewritePath=/api/claims(?<segment>/?.*), /claims$\{segment}
+      server:
+        webflux:
+          routes:
+            - id: auth-service
+              uri: ${AUTH_SERVICE_URL:http://localhost:8081}
+              predicates:
+                - Path=/api/auth/**
+              filters:
+                - RewritePath=/api/auth(?<segment>/?.*), /auth$\{segment}
+            - id: policy-service
+              uri: ${POLICY_SERVICE_URL:http://localhost:8082}
+              predicates:
+                - Path=/api/policies/**
+              filters:
+                - RewritePath=/api/policies(?<segment>/?.*), /policies$\{segment}
+            - id: claims-service
+              uri: ${CLAIMS_SERVICE_URL:http://localhost:8083}
+              predicates:
+                - Path=/api/claims/**
+              filters:
+                - RewritePath=/api/claims(?<segment>/?.*), /claims$\{segment}
 
 management:
   endpoints:
