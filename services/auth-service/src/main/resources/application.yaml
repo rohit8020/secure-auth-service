@@ -11,12 +11,12 @@ spring:
     driver-class-name: com.mysql.cj.jdbc.Driver
   jpa:
     hibernate:
-      ddl-auto: validate
+      ddl-auto: update
     open-in-view: false
     show-sql: false
     database-platform: org.hibernate.dialect.MySQLDialect
   flyway:
-    enabled: true
+    enabled: false
 
 management:
   endpoints:

@@ -11,13 +11,13 @@ spring:
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
-      ddl-auto: validate
+      ddl-auto: update
     open-in-view: false
     properties:
       hibernate:
         default_schema: claims_service
   flyway:
-    enabled: true
+    enabled: false
     default-schema: claims_service
     create-schemas: true
   data:
