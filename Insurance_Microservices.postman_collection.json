@@ -1,0 +1,654 @@
+{
+  "info": {
+    "name": "Insurance Microservices",
+    "description": "Complete API collection for Insurance Microservices Platform testing",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Auth Service",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{auth_service_url}}/auth/health",
+              "host": ["{{auth_service_url}}"],
+              "path": ["auth", "health"]
+            },
+            "header": []
+          },
+          "response": []
+        },
+        {
+          "name": "Register User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"testuser\",\n  \"email\": \"testuser@example.com\",\n  \"password\": \"SecurePass@123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/register",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "register"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.environment.set(\"token\", jsonData.token);",
+                  "    pm.environment.set(\"refresh_token\", jsonData.refreshToken);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"testuser@example.com\",\n  \"password\": \"SecurePass@123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "login"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.environment.set(\"token\", jsonData.token);",
+                  "    pm.environment.set(\"refresh_token\", jsonData.refreshToken);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Get Current User",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/auth/me",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "me"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Refresh Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refresh_token}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/refresh",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "refresh"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Admin: Create User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"admin2\",\n  \"email\": \"admin2@example.com\",\n  \"password\": \"AdminPass@123\"\n}"
+            },
+            "url": {
+              "raw": "{{auth_service_url}}/auth/admin/users",
+              "host": ["{{auth_service_url}}"],
+              "path": ["auth", "admin", "users"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Admin: List Users",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{auth_service_url}}/auth/admin/users",
+              "host": ["{{auth_service_url}}"],
+              "path": ["auth", "admin", "users"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "OAuth2: Get JWKS",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{auth_service_url}}/oauth2/jwks",
+              "host": ["{{auth_service_url}}"],
+              "path": ["oauth2", "jwks"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "OAuth2: Client Credentials",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "client_credentials"
+                },
+                {
+                  "key": "client_id",
+                  "value": "claims-service"
+                },
+                {
+                  "key": "client_secret",
+                  "value": "claims-service-secret"
+                },
+                {
+                  "key": "scope",
+                  "value": "read write"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{auth_service_url}}/oauth2/token",
+              "host": ["{{auth_service_url}}"],
+              "path": ["oauth2", "token"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Policy Service",
+      "item": [
+        {
+          "name": "List Policies",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/policies?page=0&size=20&sort=createdAt,desc",
+              "host": ["{{base_url}}"],
+              "path": ["api", "policies"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "20"
+                },
+                {
+                  "key": "sort",
+                  "value": "createdAt,desc"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Issue Policy",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$timestamp}}-policy"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"policyNumber\": \"POL-2026-001\",\n  \"policyType\": \"HOME\",\n  \"coverageAmount\": 500000,\n  \"startDate\": \"2026-04-14\",\n  \"endDate\": \"2027-04-14\",\n  \"premiumAmount\": 2500.00\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/policies",
+              "host": ["{{base_url}}"],
+              "path": ["api", "policies"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.environment.set(\"policy_id\", jsonData.policyId);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Get Policy by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/policies/{{policy_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "policies", "{{policy_id}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Renew Policy",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"renewalStartDate\": \"2027-04-14\",\n  \"renewalEndDate\": \"2028-04-14\",\n  \"premiumAmount\": 2600.00\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/policies/{{policy_id}}/renew",
+              "host": ["{{base_url}}"],
+              "path": ["api", "policies", "{{policy_id}}", "renew"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Lapse Policy",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/policies/{{policy_id}}/lapse",
+              "host": ["{{base_url}}"],
+              "path": ["api", "policies", "{{policy_id}}", "lapse"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Policy Projection (Internal)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{policy_service_url}}/internal/policies/{{policy_id}}/projection",
+              "host": ["{{policy_service_url}}"],
+              "path": ["internal", "policies", "{{policy_id}}", "projection"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Claims Service",
+      "item": [
+        {
+          "name": "List Claims",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/claims?page=0&size=20&sort=createdAt,desc",
+              "host": ["{{base_url}}"],
+              "path": ["api", "claims"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "20"
+                },
+                {
+                  "key": "sort",
+                  "value": "createdAt,desc"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Submit Claim",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$timestamp}}-claim"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"policyId\": \"{{policy_id}}\",\n  \"claimType\": \"FIRE_DAMAGE\",\n  \"claimAmount\": 50000.00,\n  \"description\": \"House fire damage\",\n  \"incidentDate\": \"2026-04-08T10:30:00Z\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/claims",
+              "host": ["{{base_url}}"],
+              "path": ["api", "claims"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.environment.set(\"claim_id\", jsonData.claimId);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Get Claim by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/claims/{{claim_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "claims", "{{claim_id}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Verify Claim",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"notes\": \"Claim verification completed. All documents verified.\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/claims/{{claim_id}}/verify",
+              "host": ["{{base_url}}"],
+              "path": ["api", "claims", "{{claim_id}}", "verify"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Approve Claim",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"approvedAmount\": 50000.00,\n  \"notes\": \"Claim approved. Payment will be processed.\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/claims/{{claim_id}}/approve",
+              "host": ["{{base_url}}"],
+              "path": ["api", "claims", "{{claim_id}}", "approve"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Reject Claim",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rejectionReason\": \"Claim amount exceeds policy coverage\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/claims/{{claim_id}}/reject",
+              "host": ["{{base_url}}"],
+              "path": ["api", "claims", "{{claim_id}}", "reject"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Monitoring",
+      "item": [
+        {
+          "name": "Prometheus Metrics",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "http://localhost:9090/api/v1/query?query=up",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "9090",
+              "path": ["api", "v1", "query"],
+              "query": [
+                {
+                  "key": "query",
+                  "value": "up"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Grafana Dashboard",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "http://localhost:3000",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Zipkin Traces",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "http://localhost:9411",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "9411"
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "auth_service_url",
+      "value": "http://localhost:8081",
+      "type": "string"
+    },
+    {
+      "key": "policy_service_url",
+      "value": "http://localhost:8082",
+      "type": "string"
+    },
+    {
+      "key": "claims_service_url",
+      "value": "http://localhost:8083",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "refresh_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "policy_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "claim_id",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}
