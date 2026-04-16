@@ -39,14 +39,37 @@ post_json() {
   local url="$1"
   local body="$2"
   shift 2
-  curl -fsS -X POST "$url" \
-    -H "Content-Type: application/json" \
-    "$@" \
-    -d "$body"
+  local response_file
+  response_file="$(mktemp)"
+
+  for attempt in $(seq 1 15); do
+    if curl --fail-with-body -sS -X POST "$url" \
+      -H "Content-Type: application/json" \
+      "$@" \
+      -d "$body" \
+      -o "$response_file"; then
+      cat "$response_file"
+      rm -f "$response_file"
+      return 0
+    fi
+
+    if [[ "$attempt" -lt 15 ]]; then
+      sleep 2
+    fi
+  done
+
+  echo "POST $url failed after retries. Last response:" >&2
+  cat "$response_file" >&2 || true
+  rm -f "$response_file"
+  return 1
 }
 
-echo "Waiting for gateway health..."
+echo "Waiting for service health..."
 wait_for "${BASE_URL}/actuator/health"
+wait_for "${BASE_URL}/api/auth/health"
+wait_for "http://localhost:8081/actuator/health"
+wait_for "http://localhost:8082/actuator/health"
+wait_for "http://localhost:8083/actuator/health"
 
 echo "Registering a policyholder..."
 register_response="$(post_json "${BASE_URL}/api/auth/register" \
