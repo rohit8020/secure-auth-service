@@ -31,6 +31,7 @@
         <spring-cloud.version>2025.0.0</spring-cloud.version>
         <testcontainers.version>1.21.4</testcontainers.version>
         <jjwt.version>0.12.5</jjwt.version>
+        <tomcat.version>10.1.54</tomcat.version>
     </properties>
 
     <dependencyManagement>
